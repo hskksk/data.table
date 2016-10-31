@@ -50,9 +50,13 @@ static inline void writeInteger(int col, int x, char **thisCh)
   if (x == NA_INTEGER) {
     //do nothing
   } else {
-    writeIntegerCore(col, &ch);
-    *ch++ = ':';
-    writeIntegerCore(x, &ch);
+    if(col==0){
+      writeIntegerCore(x, &ch);
+    }else{
+      writeIntegerCore(col, &ch);
+      *ch++ = ':';
+      writeIntegerCore(x, &ch);
+    }
   }
   *thisCh = ch;
 }
@@ -175,8 +179,10 @@ static inline void writeNumeric(int col, double x, char **thisCh)
   char *ch = *thisCh;
   // write index no when x is not NA
   if (R_FINITE(x) || !ISNAN(x)) {
-    writeInteger(col, &ch);
-    *ch++ = ':';
+    if(col>0){
+      writeInteger(col, &ch);
+      *ch++ = ':';
+    }
   }
   if (!R_FINITE(x)) {
     if (ISNAN(x)) {
@@ -479,8 +485,8 @@ SEXP writelibsvm(SEXP list_of_marices,
             SEXP mat = VECTOR_ELT(list_of_matrices, mat_i);
             int mat_ncols = NCOLS(mat);
             for (int mat_col_i = 0; mat_col_i < mat_ncols; mat_col_i++) {
-              int i = row_i+mat_col_i*nrows;
-              writeNumeric(col_i, REAL(column)[i], &ch);
+              int mat_pos_i = row_i+mat_col_i*nrows;
+              writeNumeric(col_i, REAL(column)[mat_pos_i], &ch);
               *ch++ = col_sep;
               col_i++;
             }
@@ -496,8 +502,8 @@ SEXP writelibsvm(SEXP list_of_marices,
             SEXP mat = VECTOR_ELT(list_of_matrices, mat_i);
             int mat_ncols = NCOLS(mat);
             for (int mat_col_i = 0; mat_col_i < mat_ncols; mat_col_i++) {
-              int i = row_i+mat_col_i*nrows;
-              writeInteger(col_i, INTEGER(column)[i], &ch);
+              int mat_pos_i = row_i+mat_col_i*nrows;
+              writeInteger(col_i, INTEGER(column)[mat_pos_i], &ch);
               *ch++ = col_sep;
               col_i++;
             }
@@ -517,7 +523,7 @@ SEXP writelibsvm(SEXP list_of_marices,
               SEXP str;
               switch(TYPEOF(mat)) {
               case LGLSXP:
-                true_false = LOGICAL(mat)[i];
+                true_false = LOGICAL(mat)[mat_pos_i];
                 if (true_false == NA_LOGICAL) {
                   if(col_i==0){
                     memcpy(ch, "NaN", 1);
@@ -540,7 +546,7 @@ SEXP writelibsvm(SEXP list_of_marices,
                 }
                 break;
               case REALSXP:
-                if (ISNA(REAL(mat)[i])) {
+                if (ISNA(REAL(mat)[mat_pos_i])) {
                   if(col_i==0){
                     memcpy(ch, "NaN", 1);
                     ch += 1;
@@ -548,20 +554,20 @@ SEXP writelibsvm(SEXP list_of_marices,
                 } else {
                   if (turbo) {
                     // if there are any problems with the hand rolled double writing, then turbo=FALSE reverts to standard library
-                    writeNumeric(col_i, REAL(mat)[i], &ch);
+                    writeNumeric(col_i, REAL(mat)[mat_pos_i], &ch);
                   } else {
                     //tt0 = clock();
                     if(col_i==0){
-                      ch += sprintf(ch, "%.15G", REAL(mat)[i]);
+                      ch += sprintf(ch, "%.15G", REAL(mat)[mat_pos_i]);
                     }else{
-                      ch += sprintf(ch, "%d:%.15G", col_i, REAL(mat)[i]);
+                      ch += sprintf(ch, "%d:%.15G", col_i, REAL(mat)[mat_pos_i]);
                     }
                     //tNUM += clock()-tt0;
                   }
                 }
                 break;
               case INTSXP:
-                if (INTEGER(mat)[i] == NA_INTEGER) {
+                if (INTEGER(mat)[mat_pos_i] == NA_INTEGER) {
                   // do nothing
                   if(col_i==0){
                     memcpy(ch, "NaN", 1);
@@ -571,12 +577,12 @@ SEXP writelibsvm(SEXP list_of_marices,
                   // TODO: implement factor case
                 } else {
                   if (turbo) {
-                    writeInteger(col_i, INTEGER(column)[i], &ch);
+                    writeInteger(col_i, INTEGER(column)[mat_pos_i], &ch);
                   } else {
                     if(col_i==0){
-                      ch += sprintf(ch, "%d", INTEGER(column)[i]);
+                      ch += sprintf(ch, "%d", INTEGER(column)[mat_pos_i]);
                     }else{
-                      ch += sprintf(ch, "%d:%d", col_i, INTEGER(column)[i]);
+                      ch += sprintf(ch, "%d:%d", col_i, INTEGER(column)[mat_pos_i]);
                     }
                   }
                 }
