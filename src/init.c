@@ -97,6 +97,7 @@ R_CallMethodDef callMethods[] = {
 {"Cchmatchwrapper", (DL_FUNC) &chmatchwrapper, -1},
 {"Creadfile", (DL_FUNC) &readfile, -1},
 {"Cwritefile", (DL_FUNC) &writefile, -1},
+{"Cwritefile_libsvm", (DL_FUNC) &writefile_libsvm, -1},
 {"CtraceAccuracy", (DL_FUNC) &traceAccuracy, -1},
 {"Creorder", (DL_FUNC) &reorder, -1},
 {"Crbindlist", (DL_FUNC) &rbindlist, -1},
