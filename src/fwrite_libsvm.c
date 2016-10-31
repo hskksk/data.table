@@ -256,20 +256,20 @@ static int NCOLS(SEXP x){
   }
 }
 
-SEXP writelibsvm(SEXP list_of_matrices,
-                 SEXP filenameArg,
-                 SEXP col_sep_Arg,
-                 SEXP row_sep_Arg,
-                 SEXP na_Arg,
-                 SEXP quoteArg,           // TRUE|FALSE
-                 SEXP qmethod_escapeArg,  // TRUE|FALSE
-                 SEXP append,             // TRUE|FALSE
-                 SEXP col_names,          // TRUE|FALSE
-                 SEXP verboseArg,
-                 SEXP turboArg)
+SEXP writefile_libsvm(SEXP list_of_matrices,
+                      SEXP filenameArg,
+                      SEXP col_sep_Arg,
+                      SEXP row_sep_Arg,
+                      SEXP na_Arg,
+                      SEXP quoteArg,           // TRUE|FALSE
+                      SEXP qmethod_escapeArg,  // TRUE|FALSE
+                      SEXP append,             // TRUE|FALSE
+                      SEXP col_names,          // TRUE|FALSE
+                      SEXP verboseArg,
+                      SEXP turboArg)
 {
   if (!isNewList(list_of_matrices)) error("fwrite must be passed an object of type list, data.table or data.frame");
-  RLEN nmat = NROWS(list_of_matrices);
+  RLEN nmat = length(list_of_matrices);
   if (nmat==0) error("fwrite must be passed a non-empty list");
 
   // count the number of columns
@@ -330,38 +330,41 @@ SEXP writelibsvm(SEXP list_of_matrices,
   SEXP levels[ncols];  // on-stack vla
   int lineLenMax = 2 + ncols*(int)(log10(ncols)+1);  // initialize with eol max width of \r\n on windows + length of indices
   int sameType = TYPEOF(VECTOR_ELT(list_of_matrices, 0));
-  for (int col_i=0; col_i<ncols; col_i++) {
-    SEXP mat = VECTOR_ELT(list_of_matrices, col_i);
+  for (int mat_i=0; mat_i<nmat; mat_i++) {
+    SEXP mat = VECTOR_ELT(list_of_matrices, mat_i);
+    int mat_ncols = NCOLS(mat);
     if (TYPEOF(mat) != sameType) sameType = 0;
-    switch(TYPEOF(mat)) {
-    case LGLSXP:
-      lineLenMax+=5;  // width of FALSE
-      break;
-    case REALSXP:
-      lineLenMax+=25;   // +- 15digits dec e +- nnn = 22 + 3 safety = 25
-      break;
-    case INTSXP:
-      if (isFactor(mat)) {
+    for (int mat_col_i=0; mat_col_i<mat_ncols; mat_col_i++) {
+      switch(TYPEOF(mat)) {
+      case LGLSXP:
+        lineLenMax+=1*mat_ncols;  // width of FALSE
+        break;
+      case REALSXP:
+        lineLenMax+=25*mat_ncols;   // +- 15digits dec e +- nnn = 22 + 3 safety = 25
+        break;
+      case INTSXP:
+        if (isFactor(mat)) {
+          //TODO: implement case STRSXP
+          error("Column %d's type is '%s' - not yet implemented.", mat_col_i+1,type2char(TYPEOF(mat)) );
+          levels[mat_col_i] = getAttrib(mat, R_LevelsSymbol);
+          sameType = 0; // TODO: enable deep-switch-avoidance for all columns factor
+          lineLenMax += maxStrLen(levels[mat_col_i], na_len)*(1+quote) + quote*2;
+          //                                    ^^^^^^^^^^ in case every character in the field is a quote, each to be escaped (!)
+        } else {
+          levels[mat_col_i] = NULL;
+          lineLenMax+=11*mat_ncols;   // 11 + sign
+        }
+        break;
+      case STRSXP:
         //TODO: implement case STRSXP
-        error("Column %d's type is '%s' - not yet implemented.", col_i+1,type2char(TYPEOF(mat)) );
-        levels[col_i] = getAttrib(mat, R_LevelsSymbol);
-        sameType = 0; // TODO: enable deep-switch-avoidance for all columns factor
-        lineLenMax += maxStrLen(levels[col_i], na_len)*(1+quote) + quote*2;
-        //                                    ^^^^^^^^^^ in case every character in the field is a quote, each to be escaped (!)
-      } else {
-        levels[col_i] = NULL;
-        lineLenMax+=11;   // 11 + sign
+        error("Column %d's type is '%s' - not yet implemented.", mat_col_i+1,type2char(TYPEOF(mat)) );
+        lineLenMax += maxStrLen(mat, na_len)*(1+quote) + quote*2;
+        break;
+      default:
+        error("Column %d's type is '%s' - not yet implemented.", mat_col_i+1,type2char(TYPEOF(mat)) );
       }
-      break;
-    case STRSXP:
-      //TODO: implement case STRSXP
-      error("Column %d's type is '%s' - not yet implemented.", col_i+1,type2char(TYPEOF(mat)) );
-      lineLenMax += maxStrLen(mat, na_len)*(1+quote) + quote*2;
-      break;
-    default:
-      error("Column %d's type is '%s' - not yet implemented.", col_i+1,type2char(TYPEOF(mat)) );
+      lineLenMax++;  // column separator
     }
-    lineLenMax++;  // column separator
   }
   clock_t tlineLenMax=clock()-t0;
   if (verbose) Rprintf("Maximum line length is %d calculated in %.3fs\n", lineLenMax, 1.0*tlineLenMax/CLOCKS_PER_SEC);
@@ -436,9 +439,9 @@ SEXP writelibsvm(SEXP list_of_matrices,
           ch += row_sep_len;
         }
       } else {
-        int col_i = 0;
         for (RLEN row_i = start_row; row_i < upp; row_i++) {
-          for (int mat_i = 0; mat_i < ncols; mat_i++) {
+          int col_i = 0;
+          for (int mat_i = 0; mat_i < nmat; mat_i++) {
             SEXP mat = VECTOR_ELT(list_of_matrices, mat_i);
             int mat_ncols = NCOLS(mat);
             for (int mat_col_i = 0; mat_col_i < mat_ncols; mat_col_i++) {
@@ -530,10 +533,10 @@ SEXP writelibsvm(SEXP list_of_matrices,
               *ch++ = col_sep;
               col_i++;
             }
-            ch--;  // backup onto the last col_sep after the last column
-            memcpy(ch, row_sep, row_sep_len);  // replace it with the newline. TODO: replace memcpy call with eol1 eol2 --eolLen 
-            ch += row_sep_len;
           }
+          ch--;  // backup onto the last col_sep after the last column
+          memcpy(ch, row_sep, row_sep_len);  // replace it with the newline. TODO: replace memcpy call with eol1 eol2 --eolLen 
+          ch += row_sep_len;
         }
       }
       #pragma omp ordered
