@@ -44,23 +44,6 @@ static inline int maxStrLen(SEXP x, int na_len) {
 static int na_len;
 static const char *na_str;
 
-static inline void writeInteger(int col, int x, char **thisCh)
-{
-  char *ch = *thisCh;
-  if (x == NA_INTEGER) {
-    //do nothing
-  } else {
-    if(col==0){
-      writeIntegerCore(x, &ch);
-    }else{
-      writeIntegerCore(col, &ch);
-      *ch++ = ':';
-      writeIntegerCore(x, &ch);
-    }
-  }
-  *thisCh = ch;
-}
-
 static inline void writeIntegerCore(int x, char **thisCh)
 {
   char *ch = *thisCh;
@@ -82,89 +65,29 @@ static inline void writeIntegerCore(int x, char **thisCh)
   *thisCh = ch;
 }
 
-SEXP traceAccuracy() {
-  if (sizeof(long double)!=16) Rprintf("sizeof long double is %d not 16",sizeof(long double));
-  if (sizeof(unsigned long long)!=8) Rprintf("sizeof unsigned long long is %d not 8\n",sizeof(unsigned long long));  
-  if (ULLONG_MAX != 18446744073709551615ull)  // 2^64-1
-      Rprintf("Expected ULLONG_MAX=%llu but it is %llu\n",
-                             18446744073709551615ull, ULLONG_MAX);      
-  unsigned long long foo =    5000000000000000000ull;
-  unsigned long long thresh = 1000000000000000000ull;
-  for (int i=1, dp=-19; i<=52; i++) {
-    long double ld1, ld2;
-    memset(&ld1, 0, 16);  // the compiler/machine may well not use all the bits e.g. 80 not 128.
-    memset(&ld2, 0, 16);  //    so clear that memory so that memcpy can work below
-    ld1 = 1.L/(1ull<<i);  
-    ld2 = (long double)ldexpl(1.0L,-i);
-    int cmp=memcmp(&ld1,&ld2,16);
-    const char *err = (cmp!=0) ? "**bits differ" : "";
-    Rprintf("{%llu, %d}, // 2^%03d = %.60Lf %.60Lf  %s\n",foo,dp,-i,ld1,ld2,err);
-    foo>>=1;
-    if (foo<thresh) { foo*=10; dp--; }
+static inline void writeInteger(int col, int x, char **thisCh)
+{
+  char *ch = *thisCh;
+  if (x == NA_INTEGER) {
+    //do nothing
+  } else {
+    if(col==0){
+      writeIntegerCore(x, &ch);
+    }else{
+      writeIntegerCore(col, &ch);
+      *ch++ = ':';
+      writeIntegerCore(x, &ch);
+    }
   }
-  return(R_NilValue);
+  *thisCh = ch;
 }
-/* so far have seen precisely the same output on linux and windows :
-{5000000000000000000, -19}, // 2^-01 = 0.500000000000000000000000000000000000000000000000000000000000
-{2500000000000000000, -19}, // 2^-02 = 0.250000000000000000000000000000000000000000000000000000000000
-{1250000000000000000, -19}, // 2^-03 = 0.125000000000000000000000000000000000000000000000000000000000
-{6250000000000000000, -20}, // 2^-04 = 0.062500000000000000000000000000000000000000000000000000000000
-{3125000000000000000, -20}, // 2^-05 = 0.031250000000000000000000000000000000000000000000000000000000
-{1562500000000000000, -20}, // 2^-06 = 0.015625000000000000000000000000000000000000000000000000000000
-{7812500000000000000, -21}, // 2^-07 = 0.007812500000000000000000000000000000000000000000000000000000
-{3906250000000000000, -21}, // 2^-08 = 0.003906250000000000000000000000000000000000000000000000000000
-{1953125000000000000, -21}, // 2^-09 = 0.001953125000000000000000000000000000000000000000000000000000
-{9765625000000000000, -22}, // 2^-10 = 0.000976562500000000000000000000000000000000000000000000000000
-{4882812500000000000, -22}, // 2^-11 = 0.000488281250000000000000000000000000000000000000000000000000
-{2441406250000000000, -22}, // 2^-12 = 0.000244140625000000000000000000000000000000000000000000000000
-{1220703125000000000, -22}, // 2^-13 = 0.000122070312500000000000000000000000000000000000000000000000
-{6103515625000000000, -23}, // 2^-14 = 0.000061035156250000000000000000000000000000000000000000000000
-{3051757812500000000, -23}, // 2^-15 = 0.000030517578125000000000000000000000000000000000000000000000  
-{1525878906250000000, -23}, // 2^-16 = 0.000015258789062500000000000000000000000000000000000000000000  
-{7629394531250000000, -24}, // 2^-17 = 0.000007629394531250000000000000000000000000000000000000000000  
-{3814697265625000000, -24}, // 2^-18 = 0.000003814697265625000000000000000000000000000000000000000000  
-{1907348632812500000, -24}, // 2^-19 = 0.000001907348632812500000000000000000000000000000000000000000  
-{9536743164062500000, -25}, // 2^-20 = 0.000000953674316406250000000000000000000000000000000000000000  
-{4768371582031250000, -25}, // 2^-21 = 0.000000476837158203125000000000000000000000000000000000000000  
-{2384185791015625000, -25}, // 2^-22 = 0.000000238418579101562500000000000000000000000000000000000000  
-{1192092895507812500, -25}, // 2^-23 = 0.000000119209289550781250000000000000000000000000000000000000  
-{5960464477539062500, -26}, // 2^-24 = 0.000000059604644775390625000000000000000000000000000000000000  
-{2980232238769531250, -26}, // 2^-25 = 0.000000029802322387695312500000000000000000000000000000000000  
-{1490116119384765625, -26}, // 2^-26 = 0.000000014901161193847656250000000000000000000000000000000000  
-{7450580596923828120, -27}, // 2^-27 = 0.000000007450580596923828125000000000000000000000000000000000  
-{3725290298461914060, -27}, // 2^-28 = 0.000000003725290298461914062500000000000000000000000000000000  
-{1862645149230957030, -27}, // 2^-29 = 0.000000001862645149230957031250000000000000000000000000000000  
-{9313225746154785150, -28}, // 2^-30 = 0.000000000931322574615478515625000000000000000000000000000000  
-{4656612873077392575, -28}, // 2^-31 = 0.000000000465661287307739257812500000000000000000000000000000  
-{2328306436538696287, -28}, // 2^-32 = 0.000000000232830643653869628906250000000000000000000000000000  
-{1164153218269348143, -28}, // 2^-33 = 0.000000000116415321826934814453125000000000000000000000000000  
-{5820766091346740710, -29}, // 2^-34 = 0.000000000058207660913467407226562500000000000000000000000000   
-{2910383045673370355, -29}, // 2^-35 = 0.000000000029103830456733703613281250000000000000000000000000  
-{1455191522836685177, -29}, // 2^-36 = 0.000000000014551915228366851806640625000000000000000000000000  
-{7275957614183425880, -30}, // 2^-37 = 0.000000000007275957614183425903320312500000000000000000000000  
-{3637978807091712940, -30}, // 2^-38 = 0.000000000003637978807091712951660156250000000000000000000000  
-{1818989403545856470, -30}, // 2^-39 = 0.000000000001818989403545856475830078125000000000000000000000
-{9094947017729282350, -31}, // 2^-40 = 0.000000000000909494701772928237915039062500000000000000000000
-{4547473508864641175, -31}, // 2^-41 = 0.000000000000454747350886464118957519531250000000000000000000
-{2273736754432320587, -31}, // 2^-42 = 0.000000000000227373675443232059478759765625000000000000000000
-{1136868377216160293, -31}, // 2^-43 = 0.000000000000113686837721616029739379882812500000000000000000
-{5684341886080801460, -32}, // 2^-44 = 0.000000000000056843418860808014869689941406250000000000000000
-{2842170943040400730, -32}, // 2^-45 = 0.000000000000028421709430404007434844970703125000000000000000
-{1421085471520200365, -32}, // 2^-46 = 0.000000000000014210854715202003717422485351562500000000000000
-{7105427357601001820, -33}, // 2^-47 = 0.000000000000007105427357601001858711242675781250000000000000
-{3552713678800500910, -33}, // 2^-48 = 0.000000000000003552713678800500929355621337890625000000000000
-{1776356839400250455, -33}, // 2^-49 = 0.000000000000001776356839400250464677810668945312500000000000
-{8881784197001252270, -34}, // 2^-50 = 0.000000000000000888178419700125232338905334472656250000000000
-{4440892098500626135, -34}, // 2^-51 = 0.000000000000000444089209850062616169452667236328125000000000
-{2220446049250313067, -34}, // 2^-52 = 0.000000000000000222044604925031308084726333618164062500000000
-*/
 
 union {
   double d;
   unsigned long long ull;
 } u;
 
-Rboolean verbose=FALSE; // set by writefile
+extern Rboolean verbose; // set by writefile
 
 static inline void writeNumeric(int col, double x, char **thisCh)
 {
@@ -180,7 +103,7 @@ static inline void writeNumeric(int col, double x, char **thisCh)
   // write index no when x is not NA
   if (R_FINITE(x) || !ISNAN(x)) {
     if(col>0){
-      writeInteger(col, &ch);
+      writeIntegerCore(col, &ch);
       *ch++ = ':';
     }
   }
@@ -333,7 +256,7 @@ static int NCOLS(SEXP x){
   }
 }
 
-SEXP writelibsvm(SEXP list_of_marices,
+SEXP writelibsvm(SEXP list_of_matrices,
                  SEXP filenameArg,
                  SEXP col_sep_Arg,
                  SEXP row_sep_Arg,
@@ -346,7 +269,7 @@ SEXP writelibsvm(SEXP list_of_marices,
                  SEXP turboArg)
 {
   if (!isNewList(list_of_matrices)) error("fwrite must be passed an object of type list, data.table or data.frame");
-  RLEN nmat = NROW(list_of_matrices);
+  RLEN nmat = NROWS(list_of_matrices);
   if (nmat==0) error("fwrite must be passed a non-empty list");
 
   // count the number of columns
@@ -408,9 +331,9 @@ SEXP writelibsvm(SEXP list_of_marices,
   int lineLenMax = 2 + ncols*(int)(log10(ncols)+1);  // initialize with eol max width of \r\n on windows + length of indices
   int sameType = TYPEOF(VECTOR_ELT(list_of_matrices, 0));
   for (int col_i=0; col_i<ncols; col_i++) {
-    SEXP column = VECTOR_ELT(list_of_matrices, col_i);
-    if (TYPEOF(column) != sameType) sameType = 0;
-    switch(TYPEOF(column)) {
+    SEXP mat = VECTOR_ELT(list_of_matrices, col_i);
+    if (TYPEOF(mat) != sameType) sameType = 0;
+    switch(TYPEOF(mat)) {
     case LGLSXP:
       lineLenMax+=5;  // width of FALSE
       break;
@@ -418,10 +341,10 @@ SEXP writelibsvm(SEXP list_of_marices,
       lineLenMax+=25;   // +- 15digits dec e +- nnn = 22 + 3 safety = 25
       break;
     case INTSXP:
-      if (isFactor(column)) {
+      if (isFactor(mat)) {
         //TODO: implement case STRSXP
-        error("Column %d's type is '%s' - not yet implemented.", col_i+1,type2char(TYPEOF(column)) );
-        levels[col_i] = getAttrib(column, R_LevelsSymbol);
+        error("Column %d's type is '%s' - not yet implemented.", col_i+1,type2char(TYPEOF(mat)) );
+        levels[col_i] = getAttrib(mat, R_LevelsSymbol);
         sameType = 0; // TODO: enable deep-switch-avoidance for all columns factor
         lineLenMax += maxStrLen(levels[col_i], na_len)*(1+quote) + quote*2;
         //                                    ^^^^^^^^^^ in case every character in the field is a quote, each to be escaped (!)
@@ -432,11 +355,11 @@ SEXP writelibsvm(SEXP list_of_marices,
       break;
     case STRSXP:
       //TODO: implement case STRSXP
-      error("Column %d's type is '%s' - not yet implemented.", col_i+1,type2char(TYPEOF(column)) );
-      lineLenMax += maxStrLen(column, na_len)*(1+quote) + quote*2;
+      error("Column %d's type is '%s' - not yet implemented.", col_i+1,type2char(TYPEOF(mat)) );
+      lineLenMax += maxStrLen(mat, na_len)*(1+quote) + quote*2;
       break;
     default:
-      error("Column %d's type is '%s' - not yet implemented.", col_i+1,type2char(TYPEOF(column)) );
+      error("Column %d's type is '%s' - not yet implemented.", col_i+1,type2char(TYPEOF(mat)) );
     }
     lineLenMax++;  // column separator
   }
@@ -486,7 +409,7 @@ SEXP writelibsvm(SEXP list_of_marices,
             int mat_ncols = NCOLS(mat);
             for (int mat_col_i = 0; mat_col_i < mat_ncols; mat_col_i++) {
               int mat_pos_i = row_i+mat_col_i*nrows;
-              writeNumeric(col_i, REAL(column)[mat_pos_i], &ch);
+              writeNumeric(col_i, REAL(mat)[mat_pos_i], &ch);
               *ch++ = col_sep;
               col_i++;
             }
@@ -503,7 +426,7 @@ SEXP writelibsvm(SEXP list_of_marices,
             int mat_ncols = NCOLS(mat);
             for (int mat_col_i = 0; mat_col_i < mat_ncols; mat_col_i++) {
               int mat_pos_i = row_i+mat_col_i*nrows;
-              writeInteger(col_i, INTEGER(column)[mat_pos_i], &ch);
+              writeInteger(col_i, INTEGER(mat)[mat_pos_i], &ch);
               *ch++ = col_sep;
               col_i++;
             }
@@ -577,19 +500,19 @@ SEXP writelibsvm(SEXP list_of_marices,
                   // TODO: implement factor case
                 } else {
                   if (turbo) {
-                    writeInteger(col_i, INTEGER(column)[mat_pos_i], &ch);
+                    writeInteger(col_i, INTEGER(mat)[mat_pos_i], &ch);
                   } else {
                     if(col_i==0){
-                      ch += sprintf(ch, "%d", INTEGER(column)[mat_pos_i]);
+                      ch += sprintf(ch, "%d", INTEGER(mat)[mat_pos_i]);
                     }else{
-                      ch += sprintf(ch, "%d:%d", col_i, INTEGER(column)[mat_pos_i]);
+                      ch += sprintf(ch, "%d:%d", col_i, INTEGER(mat)[mat_pos_i]);
                     }
                   }
                 }
                 break;
               case STRSXP:
                 // TODO: implement case STRSXP
-                //str = STRING_ELT(column, i);
+                //str = STRING_ELT(mat, i);
                 //if (str==NA_STRING) {
                 //  if (na_len) { memcpy(ch, na_str, na_len); ch += na_len; }
                 //} else if (quote) {
