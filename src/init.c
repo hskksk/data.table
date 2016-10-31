@@ -18,6 +18,7 @@ SEXP setcolorder();
 SEXP chmatchwrapper();
 SEXP readfile();
 SEXP writefile();
+SEXP writefile_libsvm();
 SEXP traceAccuracy();
 SEXP reorder();
 SEXP rbindlist();
